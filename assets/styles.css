@@ -1,0 +1,33 @@
+/* Contenedor compacto de las opciones de vista */
+.selector-vistas label {
+    background-color: transparent;
+    color: #555;
+    margin: 0 !important;
+    padding: 5px 10px !important;
+    border-radius: 15px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Destacar la opción seleccionada con el azul del dashboard */
+.selector-vistas label:has(input:checked) {
+    background-color: #263f8c;
+    color: white;
+    font-weight: 600;
+}
+
+/* Ocultar los círculos originales del radio */
+.selector-vistas input {
+    display: none;
+}
+
+/* Mantener el texto blanco al pasar sobre la opción seleccionada */
+.selector-vistas label:has(input:checked):hover {
+    background-color: #263f8c;
+    color: white;
+}
+
+/* Cambiar el texto de las opciones no seleccionadas al pasar el mouse */
+.selector-vistas label:not(:has(input:checked)):hover {
+    background-color: #e2e6ed;
+    color: #263f8c;
+}
