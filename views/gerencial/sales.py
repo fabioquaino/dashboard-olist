@@ -14,14 +14,14 @@ def crear_vista_gerencial_ventas(anios, meses):
                     html.Div(
                         [
                             html.H2(
-                                "Dashboard de ventas",
+                                "Desempeño comercial",
                                 style={
                                     "margin": "0 0 4px 0",
                                     "fontSize": "23px"
                                 }
                             ),
                             html.P(
-                                "Resumen general del desempeño comercial",
+                                "Indicadores generales de ventas, facturación y evolución comercial.",
                                 style={
                                     "margin": "0",
                                     "fontSize": "12px",

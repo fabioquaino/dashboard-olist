@@ -1,3 +1,4 @@
+
 # Consultar ventas, enriquecerlas con calendario y cargar pagos por separado
 import pandas as pd
 from sqlalchemy import text
@@ -91,11 +92,14 @@ def cargar_pagos():
     df["payment_installments"] = pd.to_numeric(
         df["payment_installments"], errors="coerce"
     )
-    df["payment_type"] = df["payment_type"].fillna("Sin información")
+    df["payment_type"] = df["payment_type"].fillna(
+        "Sin información"
+    )
 
     return df
 
-# Consultar ventas agrupadas según la configuración del análisis
+
+# Consultar ventas agrupadas según la configuración del análisis.
 def consultar_ventas_agrupadas(
     dimension,
     dimension_secundaria=None,
@@ -116,7 +120,10 @@ def consultar_ventas_agrupadas(
             "Categoría"
         ),
         "vendedor": ("s.seller_id", "Vendedor"),
-        "estado": ("COALESCE(s.order_status, 'Sin estado')", "Estado")
+        "estado": (
+            "COALESCE(s.order_status, 'Sin estado')",
+            "Estado"
+        )
     }
 
     medidas = {
@@ -133,7 +140,10 @@ def consultar_ventas_agrupadas(
     if dimension not in dimensiones:
         raise ValueError("Dimensión principal no válida")
 
-    if dimension_secundaria and dimension_secundaria not in dimensiones:
+    if (
+        dimension_secundaria
+        and dimension_secundaria not in dimensiones
+    ):
         raise ValueError("Dimensión secundaria no válida")
 
     metricas = metricas or ["facturacion"]
@@ -144,6 +154,7 @@ def consultar_ventas_agrupadas(
 
     # Preparar las columnas de agrupación.
     grupos = [dimension]
+
     if dimension_secundaria and dimension_secundaria != dimension:
         grupos.append(dimension_secundaria)
 
@@ -151,12 +162,15 @@ def consultar_ventas_agrupadas(
         f"{dimensiones[g][0]} AS {g}"
         for g in grupos
     ]
+
     columnas.extend(
         f"{medidas[m][0]} AS {m}"
         for m in metricas
     )
 
-    agrupacion = ", ".join(dimensiones[g][0] for g in grupos)
+    agrupacion = ", ".join(
+        dimensiones[g][0] for g in grupos
+    )
 
     # Preparar los filtros y sus parámetros.
     filtros = [
@@ -173,6 +187,7 @@ def consultar_ventas_agrupadas(
             FROM gld_sales_detail
         )"""
     ]
+
     parametros = {}
 
     if anio is not None:
@@ -187,7 +202,31 @@ def consultar_ventas_agrupadas(
         filtros.append("d.month = :mes")
         parametros["mes"] = int(mes)
 
-    if estado is not None:
+    # Aplicar el filtro de estado según la opción seleccionada.
+    estados_excluidos = ["canceled", "unavailable"]
+
+    if estado in (None, "__todos__"):
+        filtros.append(
+            "(s.order_status IS NULL OR "
+            "LOWER(TRIM(s.order_status)) NOT IN "
+            "('canceled', 'unavailable'))"
+        )
+
+    elif estado == "__entregado__":
+        filtros.append(
+            "LOWER(TRIM(s.order_status)) = 'delivered'"
+        )
+
+    elif estado == "__en_proceso__":
+        filtros.append(
+            "(s.order_status IS NULL OR "
+            "(LOWER(TRIM(s.order_status)) NOT IN "
+            "('delivered', 'canceled', 'unavailable')))"
+        )
+
+    else:
+        # Compatibilidad con llamadas anteriores que envíen
+        # un estado específico de la base.
         filtros.append("s.order_status = :estado")
         parametros["estado"] = estado
 
@@ -203,14 +242,21 @@ def consultar_ventas_agrupadas(
         ORDER BY {agrupacion}
     """)
 
-    df = pd.read_sql(consulta, engine, params=parametros)
+    df = pd.read_sql(
+        consulta,
+        engine,
+        params=parametros
+    )
 
     # Devolver los resultados resumidos y los nombres de las columnas.
     nombres = {
-        g: dimensiones[g][1] for g in grupos
+        g: dimensiones[g][1]
+        for g in grupos
     }
+
     nombres.update({
-        m: medidas[m][1] for m in metricas
+        m: medidas[m][1]
+        for m in metricas
     })
 
     df = df.rename(columns=nombres)

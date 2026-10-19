@@ -22,93 +22,174 @@ def crear_vista_analitica_ventas():
         {"label": "Compradores únicos", "value": "compradores"}
     ]
 
-    # Preparar el selector de métricas.
     return html.Div(
         [
+            # Encabezado con título a la izquierda y filtros a la derecha.
             html.Div(
                 [
-                    html.H2(
-                        "Analítica de ventas",
-                        style={"margin": "0 0 4px 0", "fontSize": "23px"}
+                    html.Div(
+                        [
+                            html.H2(
+                                "Análisis de ventas",
+                                style={
+                                    "margin": "0 0 4px 0",
+                                    "fontSize": "23px"
+                                }
+                            ),
+                            html.P(
+                                "Explorá las ventas mediante distintas dimensiones, agrupaciones y métricas.",
+                                style={
+                                    "margin": "0",
+                                    "fontSize": "12px",
+                                    "color": "#666"
+                                }
+                            )
+                        ],
+                        style={
+                            "flex": "1",
+                            "minWidth": "220px"
+                        }
                     ),
-                    html.P(
-                        "Configurá las agrupaciones y métricas para explorar las ventas.",
-                        style={"margin": "0", "fontSize": "12px", "color": "#666"}
-                    )
-                ],
-                style={"marginBottom": "18px"}
-            ),
 
-            html.Div(
-                [
+                    # Filtros del encabezado.
                     html.Div(
                         [
-                            html.Label("Agrupar por"),
-                            dcc.Dropdown(
-                                id="analitica_dimension",
-                                options=dimensiones,
-                                value="categoria",
-                                clearable=False
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Agrupar por",
+                                        style={
+                                            "fontSize": "12px",
+                                            "fontWeight": "600"
+                                        }
+                                    ),
+                                    dcc.Dropdown(
+                                        id="analitica_dimension",
+                                        options=dimensiones,
+                                        value="anio",
+                                        clearable=False
+                                    )
+                                ],
+                                style={
+                                    "flex": "1",
+                                    "minWidth": "150px"
+                                }
+                            ),
+
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Agrupación secundaria",
+                                        style={
+                                            "fontSize": "12px",
+                                            "fontWeight": "600"
+                                        }
+                                    ),
+                                    dcc.Dropdown(
+                                        id="analitica_dimension_secundaria",
+                                        options=[
+                                            {
+                                                "label": "Ninguna",
+                                                "value": "__ninguna__"
+                                            }
+                                        ] + dimensiones,
+                                        value="__ninguna__",
+                                        clearable=False
+                                    )
+                                ],
+                                style={
+                                    "flex": "1",
+                                    "minWidth": "170px"
+                                }
+                            ),
+
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Año",
+                                        style={
+                                            "fontSize": "12px",
+                                            "fontWeight": "600"
+                                        }
+                                    ),
+                                    dcc.Dropdown(
+                                        id="analitica_anio",
+                                        options=[
+                                            {
+                                                "label": "Todos",
+                                                "value": "__todos__"
+                                            }
+                                        ],
+                                        value="__todos__",
+                                        clearable=False
+                                    )
+                                ],
+                                style={
+                                    "flex": "1",
+                                    "minWidth": "100px"
+                                }
+                            ),
+
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Estado del pedido",
+                                        style={
+                                            "fontSize": "12px",
+                                            "fontWeight": "600"
+                                        }
+                                    ),
+                                    dcc.Dropdown(
+                                        id="analitica_estado",
+                                        options=[
+                                            {
+                                                "label": "Todos",
+                                                "value": "__todos__"
+                                            }
+                                        ],
+                                        value="__todos__",
+                                        clearable=False
+                                    )
+                                ],
+                                style={
+                                    "flex": "1",
+                                    "minWidth": "145px"
+                                }
                             )
                         ],
-                        style={"flex": "1", "minWidth": "180px"}
-                    ),
-                    html.Div(
-                        [
-                            html.Label("Agrupación secundaria"),
-                            dcc.Dropdown(
-                                id="analitica_dimension_secundaria",
-                                options=[
-                                    {"label": "Ninguna", "value": "__ninguna__"}
-                                ] + dimensiones,
-                                value="__ninguna__",
-                                clearable=False
-                            )
-                        ],
-                        style={"flex": "1", "minWidth": "180px"}
-                    ),
-                    html.Div(
-                        [
-                            html.Label("Año"),
-                            dcc.Dropdown(
-                                id="analitica_anio",
-                                options=[{"label": "Todos", "value": "__todos__"}],
-                                value="__todos__",
-                                clearable=False
-                            )
-                        ],
-                        style={"flex": "1", "minWidth": "120px"}
-                    ),
-                    html.Div(
-                        [
-                            html.Label("Estado del pedido"),
-                            dcc.Dropdown(
-                                id="analitica_estado",
-                                options=[{"label": "Todos", "value": "__todos__"}],
-                                value="__todos__",
-                                clearable=False
-                            )
-                        ],
-                        style={"flex": "1", "minWidth": "160px"}
+                        style={
+                            "display": "flex",
+                            "gap": "10px",
+                            "flexWrap": "wrap",
+                            "flex": "2",
+                            "minWidth": "300px"
+                        }
                     )
                 ],
                 style={
                     "display": "flex",
-                    "gap": "12px",
+                    "alignItems": "center",
+                    "justifyContent": "space-between",
+                    "gap": "24px",
                     "flexWrap": "wrap",
-                    "marginBottom": "14px"
+                    "marginBottom": "18px"
                 }
             ),
 
+            # Selector de métricas.
             html.Div(
                 [
                     html.Label("Métricas"),
                     dcc.Checklist(
                         id="analitica_metricas",
                         options=metricas,
-                        value=["facturacion", "pedidos"],
+                        value=["facturacion"],
                         inline=True,
-                        style={"display": "flex", "gap": "18px", "flexWrap": "wrap"}
+                        style={
+                            "display": "flex",
+                            "gap": "18px",
+                            "flexWrap": "wrap"
+                        }
                     )
                 ],
                 style={
@@ -119,6 +200,7 @@ def crear_vista_analitica_ventas():
                 }
             ),
 
+            # Tabla de resultados.
             html.Div(
                 [
                     dash_table.DataTable(
@@ -144,7 +226,6 @@ def crear_vista_analitica_ventas():
                             "backgroundColor": "#f0f2f5",
                             "textAlign": "left"
                         },
-                        # Mantener anchos estables para dimensiones y métricas
                         style_cell_conditional=[
                             {
                                 "if": {"column_type": "text"},
@@ -170,6 +251,7 @@ def crear_vista_analitica_ventas():
                 }
             ),
 
+            # Gráfico de análisis.
             html.Div(
                 [
                     dcc.Graph(

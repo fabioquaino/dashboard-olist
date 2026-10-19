@@ -1,5 +1,7 @@
+
 # Callbacks para filtrar fechas y actualizar los gráficos
 from dash import Input, Output, State
+
 from components.kpi import formato_numero
 from components.charts import (
     crear_grafico_facturacion,
@@ -40,8 +42,8 @@ def registrar_callbacks_ventas(app, df):
     )
     def habilitar_trimestre(modo, anio):
         return modo != "anual" or anio == "__todos__"
-    
-    # Restablecer el trimestre cuando se seleccionan todos los años
+
+    # Restablecer el trimestre cuando corresponda.
     @app.callback(
         Output("filtro_trimestre", "value"),
         Input("filtro_anio", "value"),
@@ -52,7 +54,7 @@ def registrar_callbacks_ventas(app, df):
             return "__todos__"
 
         return "__todos__"
-    
+
     # Actualizar los años disponibles según el modo de análisis.
     @app.callback(
         Output("filtro_anio", "options"),
@@ -60,7 +62,6 @@ def registrar_callbacks_ventas(app, df):
         Input("filtro_modo_fecha", "value"),
         State("filtro_anio", "value")
     )
-    # Actualizar los años disponibles según el modo de análisis
     def actualizar_opciones_anio(modo, anio_actual):
         anios_disponibles = sorted(
             df["anio"].dropna().astype(int).unique()
@@ -133,13 +134,28 @@ def registrar_callbacks_ventas(app, df):
     )
     def actualizar_dashboard(modo, anio, trimestre, mes):
 
+        # Excluir pedidos cancelados o no disponibles.
+        estados_excluidos = ["canceled", "unavailable"]
+
+        estados = (
+            df["order_status"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+
+        datos_base = df.loc[
+            ~estados.isin(estados_excluidos)
+        ].copy()
+
         # Evitar consultas con filtros incompletos.
         if modo == "mensual" and (
             anio in (None, "__todos__") or mes is None
         ):
-            datos = df.iloc[0:0].copy()
+            datos = datos_base.iloc[0:0].copy()
         else:
-            datos = df.copy()
+            datos = datos_base.copy()
 
             # Aplicar el filtro de año.
             if anio != "__todos__" and anio is not None:
@@ -152,11 +168,15 @@ def registrar_callbacks_ventas(app, df):
                 and trimestre != "__todos__"
                 and trimestre is not None
             ):
-                datos = datos[datos["trimestre"] == int(trimestre)]
+                datos = datos[
+                    datos["trimestre"] == int(trimestre)
+                ]
 
             # Aplicar el mes seleccionado dentro del año.
             if modo == "mensual" and mes is not None:
-                datos = datos[datos["mes_numero"] == int(mes)]
+                datos = datos[
+                    datos["mes_numero"] == int(mes)
+                ]
 
         # Calcular los indicadores con los datos filtrados.
         facturacion = datos["price"].sum()
@@ -175,7 +195,9 @@ def registrar_callbacks_ventas(app, df):
         if modo == "mensual" and (
             anio in (None, "__todos__") or mes is None
         ):
-            mensaje = "Seleccioná un año y un mes para consultar los datos"
+            mensaje = (
+                "Seleccioná un año y un mes para consultar los datos"
+            )
             fig_facturacion.update_layout(title=mensaje)
             fig_categorias.update_layout(title=mensaje)
             fig_vendedores.update_layout(title=mensaje)

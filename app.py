@@ -2,14 +2,13 @@
 from dash import Dash, html
 
 from data.sales import cargar_ventas
-from callbacks.sales import registrar_callbacks_ventas
+
 from callbacks.navigation import registrar_callbacks_navegacion
 from components.navigation import crear_barra_navegacion
 
-# Importar los callbacks de analítica
-from callbacks.analytics import registrar_callbacks_analitica_ventas
-
-
+from callbacks.sales.gerencial import registrar_callbacks_ventas
+from callbacks.sales.analytics import registrar_callbacks_analitica_ventas
+from callbacks.sales.decisions import registrar_callbacks_decisiones_ventas
 
 
 # Cargar los datos preparados desde Supabase.
@@ -58,6 +57,7 @@ app.layout = html.Div(
 registrar_callbacks_ventas(app, df)
 registrar_callbacks_navegacion(app, anios, meses, df)
 registrar_callbacks_analitica_ventas(app, df)
+registrar_callbacks_decisiones_ventas(app, df)
 
 # Iniciar el servidor local.
 if __name__ == "__main__":

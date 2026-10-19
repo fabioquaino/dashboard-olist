@@ -3,6 +3,7 @@ from dash import Input, Output
 
 from views.gerencial.sales import crear_vista_gerencial_ventas
 from views.analitica.sales import crear_vista_analitica_ventas
+from views.decisiones.sales import crear_vista_decisiones_ventas
 from views.placeholder import crear_vista_vacia
 
 
@@ -31,6 +32,10 @@ def registrar_callbacks_navegacion(app, anios, meses, df):
         # Mostrar el análisis de ventas.
         if dashboard == "ventas" and vista == "analitica":
             return crear_vista_analitica_ventas()
+
+        # Mostrar la toma de decisiones de ventas.
+        if dashboard == "ventas" and vista == "decisiones":
+            return crear_vista_decisiones_ventas()
 
         # Mostrar una pantalla temporal para las demás combinaciones.
         return crear_vista_vacia(dashboard, vista)

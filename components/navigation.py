@@ -36,13 +36,14 @@ def crear_barra_navegacion():
                                 options=[
                                     {"label": "Ventas", "value": "ventas"},
                                     {"label": "Logística", "value": "logistica"},
-                                    {"label": "Clientes", "value": "clientes"}
+                                    {"label": "Clientes", "value": "clientes"},
+                                    {"label": "Pagos", "value": "pagos"}
                                 ],
                                 value="ventas",
                                 clearable=False,
                                 searchable=False,
                                 style={
-                                    "width": "100px",
+                                    "width": "110px",
                                     "fontSize": "12px"
                                 }
                             )

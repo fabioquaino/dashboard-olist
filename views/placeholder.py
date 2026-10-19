@@ -6,7 +6,8 @@ def crear_vista_vacia(dashboard, vista):
     nombres_dashboard = {
         "ventas": "Ventas",
         "logistica": "Logística",
-        "clientes": "Clientes"
+        "clientes": "Clientes",
+        "pagos": "Pagos"
     }
 
     nombres_vista = {
@@ -15,16 +16,31 @@ def crear_vista_vacia(dashboard, vista):
         "decisiones": "Decisiones"
     }
 
+    nombre_dashboard = nombres_dashboard.get(
+        dashboard,
+        dashboard.capitalize()
+    )
+
+    nombre_vista = nombres_vista.get(
+        vista,
+        vista.capitalize()
+    )
+
     return html.Div(
         [
             html.H3(
-                f"{nombres_dashboard[dashboard]} - "
-                f"{nombres_vista[vista]}",
-                style={"marginTop": "0", "fontSize": "20px"}
+                f"{nombre_dashboard} - {nombre_vista}",
+                style={
+                    "marginTop": "0",
+                    "fontSize": "20px"
+                }
             ),
             html.P(
                 "Esta vista está pendiente de desarrollo.",
-                style={"fontSize": "13px", "color": "#666"}
+                style={
+                    "fontSize": "13px",
+                    "color": "#666"
+                }
             )
         ],
         style={
