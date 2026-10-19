@@ -1,7 +1,11 @@
-
 # Callbacks para la vista analítica de ventas
-from dash import Input, Output
+from io import BytesIO
+from html import escape
+
+import pandas as pd
 import plotly.express as px
+
+from dash import Input, Output, State, dcc
 
 from data.sales import consultar_ventas_agrupadas
 
@@ -24,6 +28,23 @@ def registrar_callbacks_analitica_ventas(app, df):
         {"label": "En proceso", "value": "__en_proceso__"}
     ]
 
+    nombres_metricas = {
+        "facturacion": "Facturación",
+        "articulos": "Cantidad de artículos",
+        "pedidos": "Pedidos únicos",
+        "compradores": "Compradores únicos"
+    }
+
+    nombres_dimensiones = {
+        "anio": "Año",
+        "trimestre": "Trimestre",
+        "mes": "Mes",
+        "fecha": "Fecha",
+        "categoria": "Categoría",
+        "vendedor": "Vendedor",
+        "estado": "Estado"
+    }
+
     # Cargar las opciones de los filtros cuando aparece la vista.
     @app.callback(
         Output("analitica_anio", "options"),
@@ -32,6 +53,66 @@ def registrar_callbacks_analitica_ventas(app, df):
     )
     def cargar_opciones_filtros(vista):
         return opciones_anio, opciones_estado
+
+    # Calcular los totales utilizando los filtros seleccionados.
+    def calcular_totales(anio, estado, metricas):
+        df_filtrado = df.copy()
+
+        if anio is not None:
+            df_filtrado = df_filtrado[
+                pd.to_numeric(
+                    df_filtrado["anio"], errors="coerce"
+                ) == int(anio)
+            ]
+
+        estados = (
+            df_filtrado["order_status"]
+            .fillna("Sin estado")
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+
+        if estado == "__entregado__":
+            df_filtrado = df_filtrado[
+                estados == "delivered"
+            ]
+
+        elif estado == "__en_proceso__":
+            df_filtrado = df_filtrado[
+                ~estados.isin([
+                    "delivered",
+                    "canceled",
+                    "unavailable"
+                ])
+            ]
+
+        else:
+            df_filtrado = df_filtrado[
+                ~estados.isin(["canceled", "unavailable"])
+            ]
+
+        totales = {}
+
+        if "facturacion" in metricas:
+            totales["Facturación"] = pd.to_numeric(
+                df_filtrado["price"], errors="coerce"
+            ).sum()
+
+        if "articulos" in metricas:
+            totales["Cantidad de artículos"] = len(df_filtrado)
+
+        if "pedidos" in metricas:
+            totales["Pedidos únicos"] = (
+                df_filtrado["order_id"].nunique()
+            )
+
+        if "compradores" in metricas:
+            totales["Compradores únicos"] = (
+                df_filtrado["customer_unique_id"].nunique()
+            )
+
+        return totales
 
     # Actualizar la tabla, sus estilos y el gráfico.
     @app.callback(
@@ -48,25 +129,6 @@ def registrar_callbacks_analitica_ventas(app, df):
     def actualizar_analisis(
         dimension, secundaria, anio, estado, metricas
     ):
-
-        # Definir los nombres visibles de las métricas y dimensiones.
-        nombres_metricas = {
-            "facturacion": "Facturación",
-            "articulos": "Cantidad de artículos",
-            "pedidos": "Pedidos únicos",
-            "compradores": "Compradores únicos"
-        }
-
-        nombres_dimensiones = {
-            "anio": "Año",
-            "trimestre": "Trimestre",
-            "mes": "Mes",
-            "fecha": "Fecha",
-            "categoria": "Categoría",
-            "vendedor": "Vendedor",
-            "estado": "Estado"
-        }
-
         # Evitar consultas si no hay métricas seleccionadas.
         if not metricas:
             figura = px.bar(
@@ -84,7 +146,6 @@ def registrar_callbacks_analitica_ventas(app, df):
         anio = None if anio == "__todos__" else anio
 
         # Consultar los datos agrupados en PostgreSQL.
-        # La función SQL deberá interpretar los tres valores de estado.
         df_analisis = consultar_ventas_agrupadas(
             dimension=dimension,
             dimension_secundaria=secundaria,
@@ -125,7 +186,7 @@ def registrar_callbacks_analitica_ventas(app, df):
                 columnas_orden
             ).copy()
 
-            # Calcular diferencias absolutas y porcentuales por métrica.
+            # Calcular diferencias absolutas y porcentuales.
             for metrica in metricas:
                 nombre = nombres_metricas[metrica]
 
@@ -139,13 +200,12 @@ def registrar_callbacks_analitica_ventas(app, df):
 
                 diferencia = df_analisis[nombre] - anterior
 
-                # No calcular porcentaje cuando el valor anterior es cero.
                 porcentaje = (
                     diferencia / anterior.where(anterior != 0)
                 ) * 100
 
-                df_analisis[f"Variación {nombre}"] = diferencia
-                df_analisis[f"% variación {nombre}"] = porcentaje
+                df_analisis[f"Variación {nombre}"] = diferencia.round(2)
+                df_analisis[f"% variación {nombre}"] = porcentaje.round(2)
 
             # Mostrar los resultados en orden cronológico.
             columnas_orden_final = (
@@ -157,6 +217,31 @@ def registrar_callbacks_analitica_ventas(app, df):
             df_analisis = df_analisis.sort_values(
                 columnas_orden_final
             )
+
+        # Agregar la fila TOTAL después de calcular las variaciones.
+        totales = calcular_totales(anio, estado, metricas)
+
+        fila_total = {
+            columna: None
+            for columna in df_analisis.columns
+        }
+
+        fila_total[nombre_dimension] = "TOTAL"
+
+        if hay_doble_agrupacion:
+            fila_total[nombre_dimension_secundaria] = ""
+
+        for nombre, valor in totales.items():
+            if nombre in fila_total:
+                fila_total[nombre] = valor
+
+        df_analisis = pd.concat(
+            [
+                df_analisis,
+                pd.DataFrame([fila_total])
+            ],
+            ignore_index=True
+        )
 
         # Preparar las columnas de la tabla.
         columnas_numericas = set(nombres_metricas.values())
@@ -181,12 +266,22 @@ def registrar_callbacks_analitica_ventas(app, df):
             for columna in df_analisis.columns
         ]
 
-        # Redondear los valores numéricos de la tabla a dos decimales.
+        # Redondear los valores numéricos a dos decimales.
         datos = df_analisis.round(2).to_dict("records")
 
-        # Aplicar colores según el signo de las variaciones.
-        estilos_condicionales = []
+        # Resaltar la fila TOTAL.
+        estilos_condicionales = [
+            {
+                "if": {
+                    "filter_query": '{' + nombre_dimension + '} = "TOTAL"'
+                },
+                "fontWeight": "bold",
+                "backgroundColor": "#f0f2f5",
+                "borderTop": "2px solid #9ca3af"
+            }
+        ]
 
+        # Aplicar colores según el signo de las variaciones.
         for columna in df_analisis.columns:
             if (
                 columna.startswith("Variación ")
@@ -214,7 +309,12 @@ def registrar_callbacks_analitica_ventas(app, df):
         # Seleccionar la primera métrica para el gráfico.
         nombre_metrica = nombres_metricas[metricas[0]]
 
-        if nombre_metrica not in df_analisis.columns:
+        # Excluir la fila TOTAL del gráfico.
+        datos_grafico = df_analisis[
+            df_analisis[nombre_dimension] != "TOTAL"
+        ].copy()
+
+        if nombre_metrica not in datos_grafico.columns:
             figura = px.bar(
                 title="No se encontró la métrica seleccionada"
             )
@@ -223,19 +323,17 @@ def registrar_callbacks_analitica_ventas(app, df):
                 columnas, datos, estilos_condicionales, figura
             )
 
-        # Crear el gráfico utilizando los valores originales.
-        if df_analisis.empty:
+        if datos_grafico.empty:
             figura = px.bar(
                 title="No hay datos para los filtros seleccionados"
             )
 
         elif hay_doble_agrupacion:
-            datos_grafico = df_analisis.copy()
-
-            # Tratar la dimensión secundaria como categoría.
-            datos_grafico[nombre_dimension_secundaria] = (
-                datos_grafico[nombre_dimension_secundaria].astype(str)
-            )
+            datos_grafico[
+                nombre_dimension_secundaria
+            ] = datos_grafico[
+                nombre_dimension_secundaria
+            ].astype(str)
 
             figura = px.bar(
                 datos_grafico,
@@ -251,16 +349,12 @@ def registrar_callbacks_analitica_ventas(app, df):
             )
 
         else:
-            datos_grafico = df_analisis.copy()
-
-            # Mantener el orden cronológico para las dimensiones temporales.
             if dimension in ("anio", "trimestre", "mes", "fecha"):
                 datos_grafico = datos_grafico.sort_values(
                     nombre_dimension,
                     ascending=True
                 )
             else:
-                # Ordenar las categorías por la métrica, de menor a mayor.
                 datos_grafico = datos_grafico.sort_values(
                     nombre_metrica,
                     ascending=True
@@ -288,7 +382,6 @@ def registrar_callbacks_analitica_ventas(app, df):
             yaxis_title=nombre_metrica
         )
 
-        # Evitar valores intermedios en el eje X.
         figura.update_xaxes(type="category")
 
         return (
@@ -296,4 +389,234 @@ def registrar_callbacks_analitica_ventas(app, df):
             datos,
             estilos_condicionales,
             figura
+        )
+
+    # Exportar la tabla completa a PDF.
+    @app.callback(
+        Output("descargar_analitica_pdf", "data"),
+        Input("btn_exportar_analitica_pdf", "n_clicks"),
+        State("tabla_analitica_ventas", "columns"),
+        State("tabla_analitica_ventas", "data"),
+        State("analitica_dimension", "value"),
+        State("analitica_dimension_secundaria", "value"),
+        State("analitica_anio", "value"),
+        State("analitica_estado", "value"),
+        State("analitica_metricas", "value"),
+        prevent_initial_call=True
+    )
+    def exportar_analisis_pdf(
+        n_clicks,
+        columnas,
+        datos,
+        dimension,
+        secundaria,
+        anio,
+        estado,
+        metricas
+    ):
+        if not n_clicks or not columnas:
+            return None
+
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_LEFT
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Paragraph,
+            Spacer,
+            Table,
+            TableStyle
+        )
+
+        # Crear el documento en orientación horizontal.
+        buffer = BytesIO()
+
+        documento = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=12 * mm,
+            leftMargin=12 * mm,
+            topMargin=12 * mm,
+            bottomMargin=12 * mm
+        )
+
+        estilos = getSampleStyleSheet()
+
+        estilo_celda = ParagraphStyle(
+            "Celda",
+            parent=estilos["Normal"],
+            fontName="Helvetica",
+            fontSize=7,
+            leading=9,
+            alignment=TA_LEFT,
+            wordWrap="CJK"
+        )
+
+        estilo_encabezado = ParagraphStyle(
+            "EncabezadoTabla",
+            parent=estilo_celda,
+            fontName="Helvetica-Bold",
+            textColor=colors.HexColor("#222222")
+        )
+
+        contenido = [
+            Paragraph("Análisis de ventas", estilos["Title"]),
+            Spacer(1, 3 * mm)
+        ]
+
+        # Mostrar los filtros aplicados.
+        nombre_dimension = {
+            "anio": "Año",
+            "trimestre": "Trimestre",
+            "mes": "Mes",
+            "fecha": "Fecha",
+            "categoria": "Categoría",
+            "vendedor": "Vendedor",
+            "estado": "Estado"
+        }
+
+        nombre_estado = {
+            "__todos__": "Todos",
+            "__entregado__": "Entregado",
+            "__en_proceso__": "En proceso"
+        }
+
+        nombre_metricas = {
+            "facturacion": "Facturación",
+            "articulos": "Cantidad de artículos",
+            "pedidos": "Pedidos únicos",
+            "compradores": "Compradores únicos"
+        }
+
+        texto_anio = "Todos" if anio == "__todos__" else str(anio)
+        texto_secundaria = (
+            "Ninguna"
+            if secundaria == "__ninguna__"
+            else nombre_dimension.get(secundaria, str(secundaria))
+        )
+        texto_estado = nombre_estado.get(estado, str(estado))
+        texto_metricas = ", ".join(
+            nombre_metricas.get(metrica, metrica)
+            for metrica in (metricas or [])
+        )
+
+        filtros = (
+            f"<b>Agrupar por:</b> "
+            f"{escape(nombre_dimension.get(dimension, str(dimension)))}"
+            f"&nbsp;&nbsp; <b>Agrupación secundaria:</b> "
+            f"{escape(texto_secundaria)}"
+            f"&nbsp;&nbsp; <b>Año:</b> {escape(texto_anio)}"
+            f"<br/><b>Estado del pedido:</b> {escape(texto_estado)}"
+            f"&nbsp;&nbsp; <b>Métricas:</b> {escape(texto_metricas)}"
+        )
+
+        contenido.extend([
+            Paragraph(filtros, estilos["Normal"]),
+            Spacer(1, 5 * mm)
+        ])
+
+        # Preparar los encabezados y todos los registros de la tabla.
+        encabezados = [
+            Paragraph(
+                escape(str(columna["name"])),
+                estilo_encabezado
+            )
+            for columna in columnas
+        ]
+
+        filas = [encabezados]
+        fila_total_pdf = None
+
+        for indice, registro in enumerate(datos or [], start=1):
+            fila = []
+
+            for columna in columnas:
+                valor = registro.get(columna["id"])
+
+                if valor is None:
+                    texto = ""
+                else:
+                    try:
+                        texto = "" if pd.isna(valor) else str(valor)
+                    except (TypeError, ValueError):
+                        texto = str(valor)
+
+                fila.append(
+                    Paragraph(escape(texto), estilo_celda)
+                )
+
+            filas.append(fila)
+
+            if registro.get(nombre_dimension[dimension]) == "TOTAL":
+                fila_total_pdf = indice
+
+        # Distribuir el ancho disponible entre las columnas.
+        ancho_disponible = landscape(A4)[0] - 24 * mm
+        cantidad_columnas = max(len(columnas), 1)
+
+        pesos = [
+            1.6 if indice == 0 else 1
+            for indice in range(cantidad_columnas)
+        ]
+
+        suma_pesos = sum(pesos)
+
+        anchos = [
+            ancho_disponible * peso / suma_pesos
+            for peso in pesos
+        ]
+
+        tabla = Table(
+            filas,
+            colWidths=anchos,
+            repeatRows=1,
+            hAlign="LEFT"
+        )
+
+        estilos_tabla = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f2f5")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#222222")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#d1d5db")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5)
+        ]
+
+        if fila_total_pdf is not None:
+            estilos_tabla.extend([
+                (
+                    "BACKGROUND",
+                    (0, fila_total_pdf),
+                    (-1, fila_total_pdf),
+                    colors.HexColor("#e5e7eb")
+                ),
+                (
+                    "FONTNAME",
+                    (0, fila_total_pdf),
+                    (-1, fila_total_pdf),
+                    "Helvetica-Bold"
+                ),
+                (
+                    "LINEABOVE",
+                    (0, fila_total_pdf),
+                    (-1, fila_total_pdf),
+                    1,
+                    colors.HexColor("#9ca3af")
+                )
+            ])
+
+        tabla.setStyle(TableStyle(estilos_tabla))
+        contenido.append(tabla)
+
+        documento.build(contenido)
+        buffer.seek(0)
+
+        return dcc.send_bytes(
+            buffer.getvalue(),
+            "analisis_ventas.pdf"
         )

@@ -24,7 +24,10 @@ def crear_vista_analitica_ventas():
 
     return html.Div(
         [
-            # Encabezado con título a la izquierda y filtros a la derecha.
+            # Componente para descargar el PDF.
+            dcc.Download(id="descargar_analitica_pdf"),
+
+            # Encabezado con título y filtros.
             html.Div(
                 [
                     html.Div(
@@ -51,7 +54,6 @@ def crear_vista_analitica_ventas():
                         }
                     ),
 
-                    # Filtros del encabezado.
                     html.Div(
                         [
                             html.Div(
@@ -200,9 +202,44 @@ def crear_vista_analitica_ventas():
                 }
             ),
 
-            # Tabla de resultados.
+            # Tabla de resultados y botón de exportación.
             html.Div(
                 [
+                    html.Div(
+                        [
+                            html.H3(
+                                "Resultados del análisis",
+                                style={
+                                    "margin": "0",
+                                    "fontSize": "16px"
+                                }
+                            ),
+                            html.Button(
+                                "Exportar a PDF",
+                                id="btn_exportar_analitica_pdf",
+                                n_clicks=0,
+                                style={
+                                    "backgroundColor": "#1f4e79",
+                                    "color": "white",
+                                    "border": "none",
+                                    "borderRadius": "6px",
+                                    "padding": "9px 14px",
+                                    "fontSize": "12px",
+                                    "fontWeight": "600",
+                                    "cursor": "pointer"
+                                }
+                            )
+                        ],
+                        style={
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "alignItems": "center",
+                            "gap": "12px",
+                            "flexWrap": "wrap",
+                            "marginBottom": "12px"
+                        }
+                    ),
+
                     dash_table.DataTable(
                         id="tabla_analitica_ventas",
                         columns=[],
